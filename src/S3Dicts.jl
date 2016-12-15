@@ -32,7 +32,7 @@ function Base.haskey( h::S3Dict, key)
     return !isempty( list[2] )
 end
 
-function delete!( h::S3Dict, key)
+function Base.delete!( h::S3Dict, key)
     @assert ismatch(r"^s3://", h.dir)
     fileName = joinpath( h.dir, string(key) )
     run(`aws s3 rm $(fileName)`)

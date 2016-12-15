@@ -11,3 +11,6 @@ b = as3["test"]
 b = reinterpret(UInt8, b)
 
 @assert all(a .== b)
+
+info("delete the file in s3")
+delete!(as3, "test")
