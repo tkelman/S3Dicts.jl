@@ -13,9 +13,10 @@ end
 
 function Base.setindex!(h::S3Dict, v, key)
     @assert ismatch(r"^s3://", h.dir)
-    write("/tmp/$(key)", v)
+    tempFile = tempname()
+    write(tempFile, v)
     dstFileName = joinpath(h.dir, string(key))
-    run(`aws s3 mv /tmp/$(key) $(dstFileName)`)
+    run(`aws s3 mv $(tempFile) $(dstFileName)`)
 end
 
 function Base.getindex(h::S3Dict, key)
