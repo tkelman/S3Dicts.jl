@@ -34,13 +34,26 @@ function Base.setindex!(h::S3Dict, v, key::AbstractString)
     run(`aws s3 mv $(tempFile) $(dstFileName)`)
 end
 
+# function Base.getindex(h::S3Dict, key::AbstractString)
+#     @assert ismatch(r"^s3://", h.dir)
+#     bkt,key = S3.splits3( joinpath(h.dir, key) )
+#     resp = S3.get_object(awsEnv, bkt, key)
+#     return resp.obj
+# end
+
+"""
+    Base.getindex(h::S3Dict, key::AbstractString)
+read binary file using aws command line
+"""
 function Base.getindex(h::S3Dict, key::AbstractString)
     @assert ismatch(r"^s3://", h.dir)
-    bkt,key = S3.splits3( joinpath(h.dir, key) )
-    resp = S3.get_object(awsEnv, bkt, key)
-    return resp.obj
+    tempFile = tempname()
+    srcFileName = joinpath(h.dir, key)
+    run(`aws s3 cp $srcFileName $tempFile`)
+    ret = read(tempFile)
+    rm(tempFile)
+    return ret
 end
-
 
 function Base.haskey( h::S3Dict, key::AbstractString)
     list = AWS.S3.s3_list_objects( joinpath(h.dir, key) )
