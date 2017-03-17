@@ -49,7 +49,16 @@ function Base.getindex(h::S3Dict, key::AbstractString)
     @assert ismatch(r"^s3://", h.dir)
     tempFile = tempname()
     srcFileName = joinpath(h.dir, key)
-    run(`aws s3 cp $srcFileName $tempFile`)
+    try 
+        run(`aws s3 cp $srcFileName $tempFile`)
+    catch e 
+        #if isa(e, ErrorException)
+            # return the error
+         #   return e 
+        #end
+        return e
+    end
+    # the file exist and downloaded, read and remove it.
     ret = read(tempFile)
     rm(tempFile)
     return ret
