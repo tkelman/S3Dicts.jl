@@ -1,14 +1,23 @@
 __precompile__()
 module S3Dicts
-using AWS, AWS.S3
+#using AWS, AWS.S3
 using JSON
 using Memoize
 
-# import BigArrays: get_config_dict
+import BigArrays: get_config_dict
 
-const awsEnv = AWS.AWSEnv();
+#const awsEnv = AWS.AWSEnv();
 const CONFIG_FILE_NAME = "config.json"
 const NEUROGLANCER_CONFIG_FILENAME = "info"
+
+# map datatype of python to Julia
+const DATATYPE_MAP = Dict{String, String}(
+    "uint8"     => "UInt8",
+    "uint16"    => "UInt16",
+    "uint32"    => "UInt32",
+    "float32"   => "Float32",
+    "float64"   => "Float64"
+)
 
 export S3Dict, get_config_dict
 
@@ -28,17 +37,46 @@ end
 @memoize function get_config_dict( dir::String )
     configDict=Dict{Symbol,Any}()
     try
-        bkt,key = S3.splits3( joinpath(dir, CONFIG_FILE_NAME) )
-        resp = S3.get_object(awsEnv, bkt, key)
-        configDict = JSON.parse( takebuf_string(IOBuffer(resp.obj)), dicttype=Dict{Symbol, Any} )
+        #bkt,key = S3.splits3( joinpath(dir, CONFIG_FILE_NAME) )
+        #resp = S3.get_object(awsEnv, bkt, key)
+        #configDict = JSON.parse( takebuf_string(IOBuffer(resp.obj)), dicttype=Dict{Symbol, Any} )
+        tempFile = tempname()
+        run(`aws s3 cp $(joinpath(dir, CONFIG_FILE_NAME)) $tempFile`)
+        configDict = JSON.parse(readstring(tempFile), dicttype=Dict{Symbol, Any})
+        rm(tempFile)
+    catch e
+        println("not ND format: $e")
     end
     try
         finfo = joinpath( dirname(strip(dir, '/')), NEUROGLANCER_CONFIG_FILENAME )
-        bkt,key = S3.splits3( finfo )
-        resp = S3.get_object(awsEnv, bkt, key)
-        configDict = JSON.parse( takebuf_string(IOBuffer(resp.obj)), dicttype=Dict{Symbol, Any} )
+        #bkt,key = S3.splits3( finfo )
+        #resp = S3.get_object(awsEnv, bkt, key)
+        #configDict = JSON.parse( takebuf_string(IOBuffer(resp.obj)), dicttype=Dict{Symbol, Any} )
+        tempFile = tempname()
+        run(`aws s3 cp $finfo $tempFile`)
+        configDict = JSON.parse(readstring(tempFile), dicttype=Dict{Symbol, Any})
+        rm(tempFile)
+    catch e
+        println("not a neuroglancer format: $e")
     end
     @show configDict
+    
+    if haskey(configDict, :data_type)
+        # a neuroglancer format
+        ## postprocessing for neuroglancer format
+        configDict[:dataType] = DATATYPE_MAP[ configDict[:data_type] ]
+
+        for d in configDict[:scales]
+            if configDict[:num_channels] == 1
+                configDict[:chunkSize] = d[:chunk_sizes][1]
+            else
+                configDict[:chunkSize] = [d[:chunk_sizes][1]..., configDict[:num_channels]]
+            end
+            configDict[:coding]     = d[:encoding]
+            configDict[:totalSize]  = d[:size]
+            configDict[:offset]     = d[:voxel_offset]
+        end
+    end
     return configDict
 end
 
