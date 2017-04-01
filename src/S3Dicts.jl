@@ -2,28 +2,53 @@ __precompile__()
 module S3Dicts
 using AWS, AWS.S3
 using JSON
+using Memoize
 
-import BigArrays: get_config_dict
+# import BigArrays: get_config_dict
 
 const awsEnv = AWS.AWSEnv();
 const CONFIG_FILE_NAME = "config.json"
+const NEUROGLANCER_CONFIG_FILENAME = "info"
 
 export S3Dict, get_config_dict
 
-# immutable S3Dict <: Associative end
-
 immutable S3Dict <: Associative
     dir         ::String
-    function S3Dict( dir::AbstractString )
+    configDict  ::Dict{Symbol,Any}
+    function S3Dict( dir::AbstractString, configDict::Dict{Symbol, Any} )
         @assert ismatch(r"^s3://", dir)
-        new(dir)
+        new(dir, configDict)
     end
 end
 
 function get_config_dict( h::S3Dict )
-    bkt,key = S3.splits3( joinpath(h.dir, CONFIG_FILE_NAME) )
-    resp = S3.get_object(awsEnv, bkt, key)
-    JSON.parse( takebuf_string(IOBuffer(resp.obj)), dicttype=Dict{Symbol, Any} )
+    h.configDict
+end
+
+@memoize function get_config_dict( dir::String )
+    configDict=Dict{Symbol,Any}()
+    try
+        bkt,key = S3.splits3( joinpath(dir, CONFIG_FILE_NAME) )
+        resp = S3.get_object(awsEnv, bkt, key)
+        configDict = JSON.parse( takebuf_string(IOBuffer(resp.obj)), dicttype=Dict{Symbol, Any} )
+    end
+    try
+        finfo = joinpath( dirname(strip(dir, '/')), NEUROGLANCER_CONFIG_FILENAME )
+        bkt,key = S3.splits3( finfo )
+        resp = S3.get_object(awsEnv, bkt, key)
+        configDict = JSON.parse( takebuf_string(IOBuffer(resp.obj)), dicttype=Dict{Symbol, Any} )
+    end
+    @show configDict
+    return configDict
+end
+
+"""
+    S3Dict( dir::String )
+construct S3Dict from a directory path of s3
+"""
+function S3Dict( dir::String )
+    configDict = get_config_dict(dir)
+    S3Dict(dir, configDict)
 end
 
 function Base.setindex!(h::S3Dict, v, key::AbstractString)
@@ -49,13 +74,14 @@ function Base.getindex(h::S3Dict, key::AbstractString)
     @assert ismatch(r"^s3://", h.dir)
     tempFile = tempname()
     srcFileName = joinpath(h.dir, key)
-    try 
+    try
         run(`aws s3 cp $srcFileName $tempFile`)
-    catch e 
+    catch e
         #if isa(e, ErrorException)
             # return the error
-         #   return e 
+         #   return e
         #end
+        println("download s3 file error: $e")
         return e
     end
     # the file exist and downloaded, read and remove it.
