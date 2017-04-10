@@ -7,7 +7,7 @@ using Memoize
 import BigArrays: get_config_dict
 
 #const awsEnv = AWS.AWSEnv();
-const CONFIG_FILE_NAME = "config.json"
+#const CONFIG_FILE_NAME = "config.json"
 const NEUROGLANCER_CONFIG_FILENAME = "info"
 
 # map datatype of python to Julia
@@ -36,17 +36,17 @@ end
 
 @memoize function get_config_dict( dir::String )
     configDict=Dict{Symbol,Any}()
-    try
+    #try
         #bkt,key = S3.splits3( joinpath(dir, CONFIG_FILE_NAME) )
         #resp = S3.get_object(awsEnv, bkt, key)
         #configDict = JSON.parse( takebuf_string(IOBuffer(resp.obj)), dicttype=Dict{Symbol, Any} )
-        tempFile = tempname()
-        run(`aws s3 cp $(joinpath(dir, CONFIG_FILE_NAME)) $tempFile`)
-        configDict = JSON.parse(readstring(tempFile), dicttype=Dict{Symbol, Any})
-        rm(tempFile)
-    catch e
-        println("not ND format: $e")
-    end
+     #   tempFile = tempname()
+     #   run(`aws s3 cp $(joinpath(dir, CONFIG_FILE_NAME)) $tempFile`)
+     #   configDict = JSON.parse(readstring(tempFile), dicttype=Dict{Symbol, Any})
+     #   rm(tempFile)
+    #catch e
+    #    println("not ND format: $e")
+    #end
     try
         finfo = joinpath( dirname(strip(dir, '/')), NEUROGLANCER_CONFIG_FILENAME )
         #bkt,key = S3.splits3( finfo )
@@ -57,7 +57,7 @@ end
         configDict = JSON.parse(readstring(tempFile), dicttype=Dict{Symbol, Any})
         rm(tempFile)
     catch e
-        println("not a neuroglancer format: $e")
+        warn("this is not a neuroglancer formatted dict, did not find the info file: $e")
     end
     @show configDict
     
