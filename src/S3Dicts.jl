@@ -15,6 +15,7 @@ const DATATYPE_MAP = Dict{String, String}(
     "uint8"     => "UInt8",
     "uint16"    => "UInt16",
     "uint32"    => "UInt32",
+    "uint64"    => "UInt64",
     "float32"   => "Float32",
     "float64"   => "Float64"
 )
