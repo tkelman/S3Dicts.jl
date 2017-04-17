@@ -95,7 +95,11 @@ function Base.setindex!(h::S3Dict, v, key::AbstractString)
     tempFile = tempname()
     write(tempFile, v)
     dstFileName = joinpath(h.dir, key)
-    run(`aws s3 mv $(tempFile) $(dstFileName)`)
+    if h.configDict[:coding]=="raw" || h.configDict[:coding]=="gzip"
+        run(`aws s3 mv $tempFile $dstFileName --content-encoding gzip --content-type binary/octet-stream`)
+    else
+        run(`aws s3 mv $(tempFile) $(dstFileName)`)
+    end
 end
 
 # function Base.getindex(h::S3Dict, key::AbstractString)
