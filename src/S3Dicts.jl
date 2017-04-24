@@ -1,14 +1,18 @@
 __precompile__()
 module S3Dicts
-#using AWS, AWS.S3
 using JSON
 using Memoize
+using AWSCore
+using AWSS3
+
 
 import BigArrays: get_config_dict
 
 #const awsEnv = AWS.AWSEnv();
 #const CONFIG_FILE_NAME = "config.json"
 const NEUROGLANCER_CONFIG_FILENAME = "info"
+
+const AWS_CREDENTIAL = AWSCore.aws_config()
 
 # map datatype of python to Julia
 const DATATYPE_MAP = Dict{String, String}(
@@ -35,28 +39,26 @@ function get_config_dict( h::S3Dict )
     h.configDict
 end
 
+"""
+split a s3 path to bucket name and key
+"""
+function splits3(path::AbstractString)
+    path = replace(path, "s3://", "")
+    bkt, key = split(path, "/", limit = 2)
+    return String(bkt), String(key)
+end
+
 @memoize function get_config_dict( dir::String )
     configDict=Dict{Symbol,Any}()
-    #try
-        #bkt,key = S3.splits3( joinpath(dir, CONFIG_FILE_NAME) )
-        #resp = S3.get_object(awsEnv, bkt, key)
-        #configDict = JSON.parse( takebuf_string(IOBuffer(resp.obj)), dicttype=Dict{Symbol, Any} )
-     #   tempFile = tempname()
-     #   run(`aws s3 cp $(joinpath(dir, CONFIG_FILE_NAME)) $tempFile`)
-     #   configDict = JSON.parse(readstring(tempFile), dicttype=Dict{Symbol, Any})
-     #   rm(tempFile)
-    #catch e
-    #    println("not ND format: $e")
-    #end
     try
         finfo = joinpath( dirname(strip(dir, '/')), NEUROGLANCER_CONFIG_FILENAME )
-        #bkt,key = S3.splits3( finfo )
-        #resp = S3.get_object(awsEnv, bkt, key)
-        #configDict = JSON.parse( takebuf_string(IOBuffer(resp.obj)), dicttype=Dict{Symbol, Any} )
-        tempFile = tempname()
-        run(`aws s3 cp $finfo $tempFile`)
-        configDict = JSON.parse(readstring(tempFile), dicttype=Dict{Symbol, Any})
-        rm(tempFile)
+        @show finfo
+        bkt,key = splits3( finfo )
+        data = s3_get( AWS_CREDENTIAL, bkt, key )
+        if isa(data, Vector{UInt8})
+            data = String(data)
+        end
+        configDict = JSON.parse( data, dicttype=Dict{Symbol, Any} )
     catch e
         warn("this is not a neuroglancer formatted dict, did not find the info file: $e")
     end
@@ -92,67 +94,33 @@ end
 
 function Base.setindex!(h::S3Dict, v, key::AbstractString)
     @assert ismatch(r"^s3://", h.dir)
-    tempFile = tempname()
-    write(tempFile, v)
     dstFileName = joinpath(h.dir, key)
+    bkt, key = splits3(dstFileName)
     if haskey(h.configDict, :coding) && (h.configDict[:coding]=="raw" || h.configDict[:coding]=="gzip")
-        run(`aws s3 mv $tempFile $dstFileName --content-encoding gzip --content-type binary/octet-stream`)
+        resp = s3_put(AWS_CREDENTIAL, bkt, key, v, "binary/octet-stream")
+        @assert resp.status == 200
     else
+        resp = s3_put(AWS_CREDENTIAL, bkt, key, v, "binary/octet-stream")
         println("no special encoding")
-        run(`aws s3 mv $(tempFile) $(dstFileName)`)
     end
 end
 
-# function Base.getindex(h::S3Dict, key::AbstractString)
-#     @assert ismatch(r"^s3://", h.dir)
-#     bkt,key = S3.splits3( joinpath(h.dir, key) )
-#     resp = S3.get_object(awsEnv, bkt, key)
-#     return resp.obj
-# end
-
-"""
-    Base.getindex(h::S3Dict, key::AbstractString)
-read binary file using aws command line
-"""
 function Base.getindex(h::S3Dict, key::AbstractString)
     @assert ismatch(r"^s3://", h.dir)
-    tempFile = tempname()
-    srcFileName = joinpath(h.dir, key)
-    try
-        run(`aws s3 cp $srcFileName $tempFile`)
-    catch e
-        #if isa(e, ErrorException)
-            # return the error
-         #   return e
-        #end
-        println("download s3 file error: $e")
-        return e
-    end
-    # the file exist and downloaded, read and remove it.
-    ret = read(tempFile)
-    rm(tempFile)
-    return ret
-end
-
-function Base.haskey( h::S3Dict, key::AbstractString)
-    list = AWS.S3.s3_list_objects( joinpath(h.dir, key) )
-    return !isempty( list[2] )
+    bkt,key = splits3( joinpath(h.dir, key) )
+    return s3_get(AWS_CREDENTIAL, bkt, key)
 end
 
 function Base.delete!( h::S3Dict, key::AbstractString)
     @assert ismatch(r"^s3://", h.dir)
     fileName = joinpath( h.dir, key )
-    run(`aws s3 rm $(fileName)`)
+    bkt, key = splits3( fileName ) 
+    s3_delete(AWS_CREDENTIAL, bkt, key)
 end
 
 function Base.keys( h::S3Dict )
-    buket, keyList = AWS.S3.list_objects(awsEnv, h.dir)
-    for i in eachindex(keyList)
-        keyList[i] = basename( keyList[i] )
-        if CONFIG_FILE_NAME == basename(keyList[i])
-            deleteat!(keyList, i)
-        end
-    end
+    bkt, key = splits3( h.dir )
+    keyList = s3_list_objects(AWS_CREDENTIAL, bkt, key)
     return keyList
 end
 
