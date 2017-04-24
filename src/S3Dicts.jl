@@ -74,7 +74,7 @@ end
                 configDict[:chunkSize] = [d[:chunk_sizes][1]..., configDict[:num_channels]]
             end
             configDict[:coding]     = d[:encoding]
-            configDict[:totalSize]  = d[:size]
+            configDict[:size]  = d[:size]
             configDict[:offset]     = d[:voxel_offset]
         end
     end
@@ -95,9 +95,10 @@ function Base.setindex!(h::S3Dict, v, key::AbstractString)
     tempFile = tempname()
     write(tempFile, v)
     dstFileName = joinpath(h.dir, key)
-    if h.configDict[:coding]=="raw" || h.configDict[:coding]=="gzip"
+    if haskey(h.configDict, :coding) && (h.configDict[:coding]=="raw" || h.configDict[:coding]=="gzip")
         run(`aws s3 mv $tempFile $dstFileName --content-encoding gzip --content-type binary/octet-stream`)
     else
+        println("no special encoding")
         run(`aws s3 mv $(tempFile) $(dstFileName)`)
     end
 end
