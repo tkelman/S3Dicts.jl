@@ -61,22 +61,26 @@ end
         warn("this is not a neuroglancer formatted dict, did not find the info file: $e")
     end
     @show configDict
-    
+
     if haskey(configDict, :data_type)
         # a neuroglancer format
         ## postprocessing for neuroglancer format
         configDict[:dataType] = DATATYPE_MAP[ configDict[:data_type] ]
 
-        for d in configDict[:scales]
-            if configDict[:num_channels] == 1
-                configDict[:chunkSize] = d[:chunk_sizes][1]
-            else
-                configDict[:chunkSize] = [d[:chunk_sizes][1]..., configDict[:num_channels]]
-            end
-            configDict[:coding]     = d[:encoding]
-            configDict[:totalSize]  = d[:size]
-            configDict[:offset]     = d[:voxel_offset]
+        relevant_key = split(strip(dir,'/'),"/")[end]
+        relevant_scale = filter(x -> x[:key] == relevant_key,
+                                configDict[:scales])
+        @assert length(relevant_scale) == 1
+
+        d = relevant_scale[1]
+        if configDict[:num_channels] == 1
+            configDict[:chunkSize] = d[:chunk_sizes][1]
+        else
+            configDict[:chunkSize] = [d[:chunk_sizes][1]..., configDict[:num_channels]]
         end
+        configDict[:coding]     = d[:encoding]
+        configDict[:totalSize]  = d[:size]
+        configDict[:offset]     = d[:voxel_offset]
     end
     return configDict
 end
