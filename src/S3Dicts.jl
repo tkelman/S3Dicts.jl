@@ -113,7 +113,7 @@ function Base.getindex(h::S3Dict, key::AbstractString)
         return s3_get(AWS_CREDENTIAL, bkt, key)
     catch e 
         if e.code == "NoSuchKey"
-            throw( ZeroChunkException )
+            throw( ZeroChunkException() )
         else 
             rethrow()
         end 
