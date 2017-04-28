@@ -6,7 +6,7 @@ using AWSCore
 using AWSS3
 
 
-import BigArrays: get_config_dict
+import BigArrays: get_config_dict, ZeroChunkException 
 
 #const awsEnv = AWS.AWSEnv();
 #const CONFIG_FILE_NAME = "config.json"
@@ -97,18 +97,27 @@ function Base.setindex!(h::S3Dict, v, key::AbstractString)
     dstFileName = joinpath(h.dir, key)
     bkt, key = splits3(dstFileName)
     if haskey(h.configDict, :coding) && (h.configDict[:coding]=="raw" || h.configDict[:coding]=="gzip")
-        resp = s3_put(AWS_CREDENTIAL, bkt, key, v, "binary/octet-stream")
+        resp = s3_put(AWS_CREDENTIAL, bkt, key, v, "binary/octet-stream", "gzip")
         @assert resp.status == 200
     else
         resp = s3_put(AWS_CREDENTIAL, bkt, key, v, "binary/octet-stream")
         println("no special encoding")
+        @assert resp.status == 200
     end
 end
 
 function Base.getindex(h::S3Dict, key::AbstractString)
     @assert ismatch(r"^s3://", h.dir)
     bkt,key = splits3( joinpath(h.dir, key) )
-    return s3_get(AWS_CREDENTIAL, bkt, key)
+    try 
+        return s3_get(AWS_CREDENTIAL, bkt, key)
+    catch e 
+        if e.code == "NoSuchKey"
+            throw( ZeroChunkException )
+        else 
+            rethrow()
+        end 
+    end 
 end
 
 function Base.delete!( h::S3Dict, key::AbstractString)
