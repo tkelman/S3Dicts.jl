@@ -97,12 +97,19 @@ function Base.setindex!(h::S3Dict, v, key::AbstractString)
     dstFileName = joinpath(h.dir, key)
     bkt, key = splits3(dstFileName)
     if haskey(h.configDict, :coding) && (h.configDict[:coding]=="raw" || h.configDict[:coding]=="gzip")
-        resp = s3_put(AWS_CREDENTIAL, bkt, key, v, "binary/octet-stream", "gzip")
-        @assert resp.status == 200
+        try 
+            resp = s3_put(AWS_CREDENTIAL, bkt, key, v, "binary/octet-stream", "gzip")
+        catch e
+            @show typeof(e)
+            rethrow()
+        end 
     else
-        resp = s3_put(AWS_CREDENTIAL, bkt, key, v, "binary/octet-stream")
-        println("no special encoding")
-        @assert resp.status == 200
+        try 
+            resp = s3_put(AWS_CREDENTIAL, bkt, key, v, "binary/octet-stream")
+        catch e 
+            @show typeof(e)
+            rethrow()
+        end
     end
 end
 
@@ -114,7 +121,8 @@ function Base.getindex(h::S3Dict, key::AbstractString)
     catch e 
         if e.code == "NoSuchKey"
             throw( ZeroChunkException() )
-        else 
+        else
+            @show typeof(e)
             rethrow()
         end 
     end 
