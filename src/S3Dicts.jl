@@ -118,7 +118,10 @@ function Base.getindex(h::S3Dict, key::AbstractString)
     bkt,key = splits3( joinpath(h.dir, key) )
     try 
         return s3_get(AWS_CREDENTIAL, bkt, key)
-    catch e 
+    catch e
+        println("catch error while getindex in S3Dicts: $e")
+        @show typeof(e)
+        @show e.code 
         if e.code == "NoSuchKey"
             throw( ZeroChunkException() )
         else
