@@ -5,6 +5,7 @@ using Memoize
 using AWSCore
 using AWSS3
 using Retry
+using Libz 
 
 import BigArrays: get_config_dict, NoSuchKeyException 
 
@@ -13,6 +14,7 @@ import BigArrays: get_config_dict, NoSuchKeyException
 const NEUROGLANCER_CONFIG_FILENAME = "info"
 
 const AWS_CREDENTIAL = AWSCore.aws_config()
+const IS_GZIP = true
 
 # map datatype of python to Julia
 const DATATYPE_MAP = Dict{String, String}(
@@ -92,24 +94,17 @@ function S3Dict( dir::String )
     S3Dict(dir, configDict)
 end
 
-function Base.setindex!(h::S3Dict, v, key::AbstractString)
+function Base.setindex!(h::S3Dict, v::Array, key::AbstractString)
     @assert ismatch(r"^s3://", h.dir)
     dstFileName = joinpath(h.dir, key)
     bkt, key = splits3(dstFileName)
-    if haskey(h.configDict, :coding) && (h.configDict[:coding]=="raw" || h.configDict[:coding]=="gzip")
-        try 
-            resp = s3_put(AWS_CREDENTIAL, bkt, key, v, "binary/octet-stream", "gzip")
-        catch e
-            @show typeof(e)
-            rethrow()
-        end 
-    else
-        try 
-            resp = s3_put(AWS_CREDENTIAL, bkt, key, v, "binary/octet-stream")
-        catch e 
-            @show typeof(e)
-            rethrow()
-        end
+    @repeat 4 try 
+        v = Libz.deflate(reinterpret(UInt8, v[:]))
+        resp = s3_put(AWS_CREDENTIAL, bkt, key, v, "binary/octet-stream", "gzip")
+    catch e
+        println("catch error while saving in BigArrays: $e")
+        @show typeof(e)
+        @delay_retry if true end
     end
 end
 
@@ -118,7 +113,8 @@ function Base.getindex(h::S3Dict, key::AbstractString)
     bucket,key = splits3( joinpath(h.dir, key) )
     
 	@repeat 5 try
-        return AWSS3.s3(AWS_CREDENTIAL, "GET", bucket; path = key, version="")
+        data = AWSS3.s3(AWS_CREDENTIAL, "GET", bucket; path = key, version="")
+        return Libz.inflate(data)
     catch e
         @show e 
         @show typeof(e)
