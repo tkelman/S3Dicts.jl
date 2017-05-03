@@ -4,9 +4,9 @@ using JSON
 using Memoize
 using AWSCore
 using AWSS3
+using Retry
 
-
-import BigArrays: get_config_dict, ZeroChunkException 
+import BigArrays: get_config_dict, NoSuchKeyException 
 
 #const awsEnv = AWS.AWSEnv();
 #const CONFIG_FILE_NAME = "config.json"
@@ -115,20 +115,19 @@ end
 
 function Base.getindex(h::S3Dict, key::AbstractString)
     @assert ismatch(r"^s3://", h.dir)
-    bkt,key = splits3( joinpath(h.dir, key) )
-    try 
-        return s3_get(AWS_CREDENTIAL, bkt, key)
+    bucket,key = splits3( joinpath(h.dir, key) )
+    
+	@repeat 4 try
+        return AWSS3.s3(AWS_CREDENTIAL, "GET", bucket; path = key)
     catch e
-        println("catch error while getindex in S3Dicts: $e")
-        @show typeof(e)
-        @show e.code 
+        @retry if e.code != "NoSuchKey" 
+            println("not a NoSuchKey error, retry after 30 seconds")
+            sleep(30)
+        end
         if e.code == "NoSuchKey"
-            throw( ZeroChunkException() )
-        else
-            @show typeof(e)
-            rethrow()
+            throw( NoSuchKeyException() )
         end 
-    end 
+    end
 end
 
 function Base.delete!( h::S3Dict, key::AbstractString)
