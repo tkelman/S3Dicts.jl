@@ -118,12 +118,9 @@ function Base.getindex(h::S3Dict, key::AbstractString)
     bucket,key = splits3( joinpath(h.dir, key) )
     
 	@repeat 4 try
-        return AWSS3.s3(AWS_CREDENTIAL, "GET", bucket; path = key)
+        return AWSS3.s3(AWS_CREDENTIAL, "GET", bucket; path = key, version="")
     catch e
-        @retry if e.code != "NoSuchKey" 
-            println("not a NoSuchKey error, retry after 30 seconds")
-            sleep(30)
-        end
+        @delay_retry if e.code != "NoSuchKey" end
         if e.code == "NoSuchKey"
             throw( NoSuchKeyException() )
         end 
