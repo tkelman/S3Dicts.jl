@@ -142,5 +142,10 @@ function Base.values(h::S3Dict)
     error("normally values are too large to get them all to RAM")
 end
 
+function Base.haskey(h::S3Dict, key::String)
+    bkt, dir = splits3( h.dir )
+    lst = s3_list_objects(AWS_CREDENTIAL, bkt, joinpath(dir, key))
+    return !isempty(lst)
+end 
 
 end # end of module S3Dicts
