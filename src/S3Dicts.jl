@@ -112,7 +112,7 @@ function Base.getindex(h::S3Dict, key::AbstractString)
     @assert ismatch(r"^s3://", h.dir)
     bucket,key = splits3( joinpath(h.dir, key) )
     
-	@repeat 5 try
+	@repeat 2 try
         data = AWSS3.s3(AWS_CREDENTIAL, "GET", bucket; path = key, version="")
         return Libz.inflate(data)
     catch e
