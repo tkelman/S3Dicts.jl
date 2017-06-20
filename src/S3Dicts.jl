@@ -1,18 +1,14 @@
-__precompile__()
+#__precompile__()
 module S3Dicts
+
 using JSON
-using Memoize
 using AWSCore
 using AWSS3
 using Retry
 using Libz 
+using Memoize
 
-import BigArrays: get_config_dict, NoSuchKeyException 
-
-#const awsEnv = AWS.AWSEnv();
-#const CONFIG_FILE_NAME = "config.json"
 const NEUROGLANCER_CONFIG_FILENAME = "info"
-
 const AWS_CREDENTIAL = AWSCore.aws_config()
 const IS_GZIP = true
 
@@ -26,15 +22,11 @@ const DATATYPE_MAP = Dict{String, String}(
     "float64"   => "Float64"
 )
 
-export S3Dict, get_config_dict
+export S3Dict
 
 immutable S3Dict <: Associative
     dir         ::String
     configDict  ::Dict{Symbol,Any}
-    function S3Dict( dir::AbstractString, configDict::Dict{Symbol, Any} )
-        @assert ismatch(r"^s3://", dir)
-        new(dir, configDict)
-    end
 end
 
 function get_config_dict( h::S3Dict )
@@ -60,6 +52,7 @@ end
         if isa(data, Vector{UInt8})
             data = String(data)
         end
+        @show data
         configDict = JSON.parse( data, dicttype=Dict{Symbol, Any} )
     catch e
         warn("this is not a neuroglancer formatted dict, did not find the info file: $e")
