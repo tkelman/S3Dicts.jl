@@ -7,6 +7,7 @@ using AWSS3
 using Retry
 using Libz 
 using Memoize
+import BigArrays: NoSuchKeyException 
 
 const NEUROGLANCER_CONFIG_FILENAME = "info"
 const AWS_CREDENTIAL = AWSCore.aws_config()
