@@ -13,7 +13,7 @@ const NEUROGLANCER_CONFIG_FILENAME = "info"
 const AWS_CREDENTIAL = AWSCore.aws_config()
 const IS_GZIP = true
 
-const METADATA = Dict{String, String}(
+const DEFAULT_METADATA = Dict{String, String}(
             "Content-Type"      => "binary/octet-stream", 
             "Content-Encoding"  => "gzip")
 
@@ -87,8 +87,10 @@ end
     S3Dict( dir::String )
 construct S3Dict from a directory path of s3
 """
-function S3Dict( dir::String )
+function S3Dict( dir::String, 
+                metadata::Dict{String,String}=DEFAULT_METADATA )
     configDict = get_config_dict(dir)
+    configDict[:metadata] = metadata
     S3Dict(dir, configDict)
 end
 
@@ -99,7 +101,7 @@ function Base.setindex!(h::S3Dict, v::Array, key::AbstractString)
     @repeat 4 try 
         v = Libz.deflate(reinterpret(UInt8, v[:]))
         resp = s3_put(AWS_CREDENTIAL, bkt, key, v, 
-                      metadata=METADATA)
+                      metadata=h.configDict[:metadata])
     catch e
         println("catch error while saving in BigArrays: $e")
         @show typeof(e)
