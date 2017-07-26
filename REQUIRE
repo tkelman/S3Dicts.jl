@@ -1,8 +1,6 @@
 julia 0.5
-AWSCore
 AWSS3
 JSON
 Retry
 Libz
 Memoize
-BigArrays
