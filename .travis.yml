@@ -13,4 +13,5 @@ script:
     - julia -e 'Pkg.update()'
     - julia -e 'Pkg.clone("https://github.com/samoconnor/AWSCore.jl.git")'
     - julia -e 'Pkg.clone("https://github.com/samoconnor/AWSS3.jl.git")'
+    - julia -e 'Pkg.clone("https://github.com/seung-lab/BigArrays.jl.git")'
     - julia -e 'Pkg.clone(pwd()); Pkg.test("S3Dicts")'
