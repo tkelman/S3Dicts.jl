@@ -10,4 +10,6 @@ git:
   depth: 999999
 
 script:
+    - julia -e 'Pkg.clone("https://github.com/samoconnor/AWSCore.jl.git")'
+    - julia -e 'Pkg.clone("https://github.com/samoconnor/AWSS3.jl.git")'
     - julia -e 'Pkg.clone(pwd()); Pkg.test("S3Dicts")'

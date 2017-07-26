@@ -13,6 +13,10 @@ const NEUROGLANCER_CONFIG_FILENAME = "info"
 const AWS_CREDENTIAL = AWSCore.aws_config()
 const IS_GZIP = true
 
+const METADATA = Dict{String, String}(
+            "Content-Type"      => "binary/octet-stream", 
+            "Content-Encoding"  => "gzip")
+
 # map datatype of python to Julia
 const DATATYPE_MAP = Dict{String, String}(
     "uint8"     => "UInt8",
@@ -94,7 +98,8 @@ function Base.setindex!(h::S3Dict, v::Array, key::AbstractString)
     bkt, key = splits3(dstFileName)
     @repeat 4 try 
         v = Libz.deflate(reinterpret(UInt8, v[:]))
-        resp = s3_put(AWS_CREDENTIAL, bkt, key, v, "binary/octet-stream", "gzip")
+        resp = s3_put(AWS_CREDENTIAL, bkt, key, v, 
+                      metadata=METADATA)
     catch e
         println("catch error while saving in BigArrays: $e")
         @show typeof(e)
