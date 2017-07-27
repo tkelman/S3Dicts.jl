@@ -7,7 +7,6 @@ using AWSS3
 using Retry
 using Libz 
 using Memoize
-import BigArrays: NoSuchKeyException 
 
 const NEUROGLANCER_CONFIG_FILENAME = "info"
 const AWS_CREDENTIAL = AWSCore.aws_config()
@@ -121,7 +120,7 @@ function Base.getindex(h::S3Dict, key::AbstractString)
         @show typeof(e)
         @delay_retry if e.code != "NoSuchKey" end
         if e.code == "NoSuchKey"
-            throw( NoSuchKeyException() )
+            throw( KeyError("no such key: $(key)") )
         end 
     end
 end
